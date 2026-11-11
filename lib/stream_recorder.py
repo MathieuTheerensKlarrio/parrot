@@ -1,14 +1,15 @@
 from config.config import *
-import pyaudio
-import struct
+import sounddevice as sd
 import wave
 import math
 import numpy as np
 from lib.print_status import get_current_status
 from lib.stream_processing import process_audio_frame, post_processing
+from lib.wav import rewrite_wav_sizes
 from lib.typing import DetectionState, DetectionFrame
 from typing import List
 import io
+
 
 class StreamRecorder:
     total_wav_filename: str
@@ -16,8 +17,7 @@ class StreamRecorder:
     thresholds_filename: str
     comparison_wav_filename: str
     
-    audio: pyaudio.PyAudio
-    stream: pyaudio.Stream
+    stream: sd.InputStream
     detection_state: DetectionState
     
     length_per_frame: int
@@ -28,13 +28,12 @@ class StreamRecorder:
     current_occurrence: List[DetectionFrame]
     false_occurrence: List[DetectionFrame]
     
-    def __init__(self, audio: pyaudio.PyAudio, stream: pyaudio.Stream, total_wav_filename: str, srt_filename: str, detection_state: DetectionState):
+    def __init__(self, stream: sd.InputStream, total_wav_filename: str, srt_filename: str, detection_state: DetectionState):
         self.total_wav_filename = total_wav_filename
         self.srt_filename = srt_filename
         self.comparison_wav_filename = srt_filename.replace(".v" + str(CURRENT_VERSION) + ".srt", "_comparison.wav")
         self.thresholds_filename = srt_filename.replace(".v" + str(CURRENT_VERSION) + ".srt", "_thresholds.txt")
         
-        self.audio = audio
         self.stream = stream
         self.detection_state = detection_state
         self.total_audio_frames = []
@@ -48,7 +47,7 @@ class StreamRecorder:
         # Write the source file first with the right settings to add the headers, and write the data later
         totalWaveFile = wave.open(self.total_wav_filename, 'wb')
         totalWaveFile.setnchannels(CHANNELS)
-        totalWaveFile.setsampwidth(audio.get_sample_size(FORMAT))
+        totalWaveFile.setsampwidth(SAMPLE_WIDTH)
         totalWaveFile.setframerate(RATE)
         totalWaveFile.close()
     
@@ -76,11 +75,6 @@ class StreamRecorder:
             self.persist_total_wav_file()
     
     def persist_total_wav_file(self):    
-        # This is used to modify the wave file directly
-        CHUNK_SIZE_OFFSET = 4
-        DATA_SUB_CHUNK_SIZE_SIZE_OFFSET = 40
-        LITTLE_ENDIAN_INT = struct.Struct('<I')
-    
         byteString = b''.join(self.total_audio_frames)
         self.total_audio_frames = []
         appendTotalFile = open(self.total_wav_filename, 'ab')
@@ -92,22 +86,15 @@ class StreamRecorder:
         # Which wouldn't be needed if the wave package supported appending properly                        
         # Thanks to hydrogen18.com for the explanation and code
         appendTotalFile = open(self.total_wav_filename, 'r+b')
-        appendTotalFile.seek(0,2)
-        chunk_size = appendTotalFile.tell() - 8
-        appendTotalFile.seek(CHUNK_SIZE_OFFSET)
-        appendTotalFile.write(LITTLE_ENDIAN_INT.pack(chunk_size))
-        appendTotalFile.seek(DATA_SUB_CHUNK_SIZE_SIZE_OFFSET)
-        sample_length = 2 * ( self.index * self.length_per_frame )
-        
-        appendTotalFile.write(LITTLE_ENDIAN_INT.pack(sample_length))
+        rewrite_wav_sizes(appendTotalFile)
         appendTotalFile.close()
 
     # Resume playing
     def resume(self):
-        self.stream.start_stream()
+        self.stream.start()
     
     def pause(self):
-        self.stream.stop_stream()
+        self.stream.stop()
         
         self.index -= len(self.total_audio_frames)
         if self.index != 0 and len(self.total_audio_frames) > 0:
@@ -141,7 +128,7 @@ class StreamRecorder:
         if clear_file:
             totalWaveFile = wave.open(self.total_wav_filename, 'wb')
             totalWaveFile.setnchannels(CHANNELS)
-            totalWaveFile.setsampwidth(self.audio.get_sample_size(FORMAT))
+            totalWaveFile.setsampwidth(SAMPLE_WIDTH)
             totalWaveFile.setframerate(RATE)
             totalWaveFile.close()
             
@@ -153,17 +140,7 @@ class StreamRecorder:
                 f.truncate()
                 
                 # Overwrite the total recording length
-                CHUNK_SIZE_OFFSET = 4
-                DATA_SUB_CHUNK_SIZE_SIZE_OFFSET = 40
-                LITTLE_ENDIAN_INT = struct.Struct('<I')
-
-                f.seek(0,2)
-                chunk_size = f.tell() - 8
-                f.seek(CHUNK_SIZE_OFFSET)
-                f.write(LITTLE_ENDIAN_INT.pack(chunk_size))
-                f.seek(DATA_SUB_CHUNK_SIZE_SIZE_OFFSET)
-                sample_length = 2 * ( self.index * self.length_per_frame )
-                f.write(LITTLE_ENDIAN_INT.pack(sample_length))        
+                rewrite_wav_sizes(f)
         
         return should_resume
     
@@ -187,11 +164,10 @@ class StreamRecorder:
 
         comparison_wav_file = wave.open(self.comparison_wav_filename, 'wb')
         comparison_wav_file.setnchannels(CHANNELS)
-        comparison_wav_file.setsampwidth(self.audio.get_sample_size(FORMAT))
+        comparison_wav_file.setsampwidth(SAMPLE_WIDTH)
         comparison_wav_file.setframerate(RATE)
         post_processing(self.detection_frames, self.detection_state, self.srt_filename, self.thresholds_filename, callback, comparison_wav_file)
         self.stream.close()
-        self.audio.terminate()
         self.detection_frames = []
 
     # Do all post processing related tasks that cannot be done during runtime

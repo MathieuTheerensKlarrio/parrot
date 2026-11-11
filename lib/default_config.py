@@ -1,7 +1,22 @@
 from importlib.util import find_spec
+import os
 import sys
 
-import pyaudio
+import numpy as np
+
+try:
+    import sounddevice as sd
+except ImportError:
+    raise SystemExit(
+        "Parrot records audio through sounddevice.\n"
+        "Update your environment with: pip install -r requirements-" +
+        ("windows" if sys.platform == "win32" else "posix") + ".txt")
+except OSError as error:
+    # sounddevice needs PortAudio itself at run time. Its wheel carries a copy
+    # on Windows and macOS, so only Linux can arrive here.
+    raise SystemExit(
+        "sounddevice could not load PortAudio: " + str(error) + "\n"
+        "On Debian and Ubuntu: sudo apt-get install libportaudio2")
 
 if sys.platform == "darwin":
     # This is necessary to import before pyautogui
@@ -12,12 +27,17 @@ import pyautogui
 
 pyautogui.FAILSAFE = False
 
-default_audio = pyaudio.PyAudio().get_default_input_device_info()
+try:
+    default_audio = sd.query_devices(kind="input")
+except (sd.PortAudioError, ValueError):
+    default_audio = None
+
 REPEAT_DELAY = 0.5
 REPEAT_RATE = 33
 SPEECHREC_ENABLED = False
 
-FORMAT = pyaudio.paInt16
+FORMAT = "int16"
+SAMPLE_WIDTH = np.dtype(FORMAT).itemsize
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1024
@@ -39,15 +59,19 @@ TYPE_FEATURE_ENGINEERING_NORM_MFCC = 3
 TYPE_FEATURE_ENGINEERING_NORM_MFSC = 4
 FEATURE_ENGINEERING_TYPE = TYPE_FEATURE_ENGINEERING_NORM_MFSC
 
-DATASET_FOLDER = "data/recordings"
-RECORDINGS_FOLDER = "data/recordings"
-REPLAYS_FOLDER = "data/replays"
-REPLAYS_AUDIO_FOLDER = "data/replays/audio"
+_data_dir = os.environ.get("PARROT_DATA_DIR")
+DATA_DIR = os.path.abspath(_data_dir) if _data_dir else "data"
+DATASET_FOLDER = DATA_DIR + "/recordings"
+RECORDINGS_FOLDER = DATA_DIR + "/recordings"
+REPLAYS_FOLDER = DATA_DIR + "/replays"
+REPLAYS_AUDIO_FOLDER = DATA_DIR + "/replays/audio"
 REPLAYS_FILE = REPLAYS_FOLDER + "/run.csv"
-CLASSIFIER_FOLDER = "data/models"
+CLASSIFIER_FOLDER = DATA_DIR + "/models"
+CODE_FOLDER = DATA_DIR + "/code"
+# Ships with parrot, not user data
 OVERLAY_FOLDER = "data/overlays"
 COORDINATE_FILEPATH = "config/current-coordinate.txt"
-CONVERSION_OUTPUT_FOLDER = "data/output"
+CONVERSION_OUTPUT_FOLDER = DATA_DIR + "/output"
 PATH_TO_FFMPEG = "ffmpeg/bin/ffmpeg"
 
 DEFAULT_CLF_FILE = ""
@@ -69,6 +93,7 @@ if( SPEECHREC_ENABLED == True ):
 
 BACKGROUND_LABEL = "silence"
 AUTOMATIC_DATASET_BALANCING = True
+SILENCE_TRAINING_MODE = "all" # how much silence is used in training - "all", "balanced", "none"
 SHOULD_FIT_INSIDE_RAM = True # Ensure the dataset fits inside RAM for faster training
 # Turning this to FALSE might crash the dataloading
 MAX_RAM = 7000000000 # 7GB of usable RAM is assumed to be the maximum size to be loaded in for data

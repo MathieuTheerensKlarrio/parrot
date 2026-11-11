@@ -5,7 +5,7 @@ It's name is inspired by the way parrots and parakeets communicate, using chirps
 
 # Software requirements
 * Windows version 7 and up, MacOS or Linux (X11)
-* Python 3.8 (64 bit)
+* Python 3.12 (64 bit)
 * Project IRIS ( OPTIONAL - Used for turning the eyetracker into a mouse cursor )
 
 Python packages such as
@@ -13,7 +13,7 @@ Python packages such as
 * pandas 
 * matplotlib *( for the graphing of test results )*
 * scikit-learn *( for the machine learning bits )*
-* pyaudio *( audio recording and playing )*
+* sounddevice *( audio recording and playing )*
 * python_speech_features *( for audio manipulation, specifically the MFCC algorithm )*
 * pyautogui *( for mouse and keyboard simulation )*
 * pydirectinput *( for mouse and keyboard simulation, but with DirectX keycodes instead )*
@@ -69,3 +69,14 @@ I will expand this document once I learn more during the development. In the mea
 
 If you desire to use Parrot.PY inside of Talon, take a look at this page explaining the [integration with Talon Voice](docs/TALON_VOICE.md).
 For examples and explanation of how to interact with a running Parrot instance from your own programs, read up on [interfacing with other programs](docs/INTERFACING.md).
+
+# Desktop app (work in progress)
+
+Not ready for use yet. Being added in pieces.
+
+On top of a [working install](docs/INSTALLATION.md):
+
+```
+pip install -r requirements-gui.txt
+python -m gui
+```

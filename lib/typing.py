@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Literal, Optional, Tuple, TypedDict
 
 @dataclass
 class TransitionEvent:
@@ -67,3 +67,25 @@ class DetectionState:
     spectral_onset_threshold: float = None # Threshold for detecting onsets
     upper_bound_dBFS_threshold: float = None # Determined upper bound for dynamic dBFS threshold
     dBFS_error_margin: float = 0
+    unlabeled_frames: int = 0 # Detected live, no label matched afterwards
+
+class RunSettings(TypedDict):
+    silence: Literal["all", "balanced", "none"]
+    balance_sounds: bool
+
+class Checkpoint(TypedDict, total=False):
+    input_size: int
+    labels: List[str]
+    accuracy: float
+    last_row: Dict[str, float]
+    loss: float
+    epoch: int
+    random_seed: int
+    label_accuracy: Dict[str, float]
+    combined_accuracy: float
+    label_frames: Dict[str, int]
+    trained_at: int
+    run_settings: RunSettings
+
+TrainedAtSource = Literal["checkpoint", "replay", "mtime"]
+TrainedAt = Tuple[Optional[float], Optional[TrainedAtSource]]

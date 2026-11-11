@@ -9,6 +9,7 @@ import numpy as np
 from scipy.fftpack import fft
 from scipy.fftpack import fftfreq
 from lib.machinelearning import get_loudest_freq, get_recording_power
+from lib.wav import get_frame_count
 import audioop
 
 def convert_files( with_intro ):            
@@ -153,7 +154,7 @@ def segment_input_file(threshold, power_threshold, frequency_threshold, begin_th
 
     wf = wave.open(WAVE_INPUT_FILE, 'rb')
     number_channels = wf.getnchannels()
-    total_frames = wf.getnframes()
+    total_frames = get_frame_count(wf, WAVE_INPUT_FILE)
     frame_rate = wf.getframerate()
     frames_to_read = round( frame_rate * RECORD_SECONDS / SLIDING_WINDOW_AMOUNT )
     
@@ -163,7 +164,6 @@ def segment_input_file(threshold, power_threshold, frequency_threshold, begin_th
         delay_threshold = begin_threshold * -1
         begin_threshold = 1000
 
-    audio = pyaudio.PyAudio()
     record_wave_file_count = 0
     index = 0
     while( wf.tell() < total_frames ):
@@ -195,7 +195,7 @@ def segment_input_file(threshold, power_threshold, frequency_threshold, begin_th
                         files_recorded += 1
                         waveFile = wave.open(WAVE_OUTPUT_FILENAME + str(index) + WAVE_OUTPUT_FILE_EXTENSION, 'wb')
                         waveFile.setnchannels(number_channels)
-                        waveFile.setsampwidth(audio.get_sample_size(FORMAT))
+                        waveFile.setsampwidth(SAMPLE_WIDTH)
                         waveFile.setframerate(frame_rate)
                         waveFile.writeframes(byteString)
                         waveFile.close()

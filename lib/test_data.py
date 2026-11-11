@@ -1,5 +1,5 @@
 from config.config import *
-import pyaudio
+import sounddevice as sd
 import wave
 import time
 from time import sleep
@@ -12,7 +12,7 @@ import os
 import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
-import pyaudio
+import sounddevice as sd
 from lib.listen import start_nonblocking_listen_loop, predict_wav_files, validate_microphone_input
 from lib.machinelearning import feature_engineering
 import csv
@@ -171,8 +171,7 @@ def audio_analysis( available_models ):
         new_or_existing = input("")
     
     if( new_or_existing.lower() == "n" ):
-        audio = pyaudio.PyAudio()
-        if (validate_microphone_input(audio) == False):
+        if (validate_microphone_input() == False):
             return
     
         for wav_file in wav_files:
@@ -469,4 +468,4 @@ def plot_bars( learning_data, index ):
         plt.bar(num, learning_row[column] * 100, color=color, linewidth=1, alpha=0.9, label=column)
             
     plt.legend(loc=1, ncol=7)
-    plt.savefig('data/evolution_images/8884-' + string_epoch + '.png')			
+    plt.savefig(DATA_DIR + '/evolution_images/8884-' + string_epoch + '.png')			
