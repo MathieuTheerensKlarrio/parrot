@@ -1,0 +1,2 @@
+reject_duration_type=continuous
+reject_min_dbfs=-14.09

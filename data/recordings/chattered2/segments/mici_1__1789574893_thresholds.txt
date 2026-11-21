@@ -1,0 +1,2 @@
+chattered2_duration_type=continuous
+chattered2_min_dbfs=-30.0

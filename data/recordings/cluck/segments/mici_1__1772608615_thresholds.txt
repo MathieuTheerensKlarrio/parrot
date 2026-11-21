@@ -1,0 +1,2 @@
+cluck_duration_type=continuous
+cluck_min_dbfs=-71.08

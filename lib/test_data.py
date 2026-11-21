@@ -307,7 +307,7 @@ def test_accuracy( available_models, available_sounds ):
     for index, sound in enumerate(available_sounds):
         if( sound in classifier.classes_ or ( MICROPHONE_SEPARATOR and sound.split( MICROPHONE_SEPARATOR )[0] in classifier.classes_ ) ):
             # First sort the wav files by time
-            recordings_dir = os.path.join(RECORDINGS_FOLDER, sound )
+            recordings_dir = os.path.join(RECORDINGS_FOLDER, sound, "segments" )
             wav_files = os.listdir(recordings_dir)            
             full_wav_files = []
             

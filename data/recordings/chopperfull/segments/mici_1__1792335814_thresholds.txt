@@ -1,0 +1,2 @@
+chopperfull_duration_type=continuous
+chopperfull_min_dbfs=-28.35

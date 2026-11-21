@@ -1,0 +1,2 @@
+spit_duration_type=discrete
+spit_min_dbfs=-36.59

@@ -1,0 +1,2 @@
+chatter_duration_type=continuous
+chatter_min_dbfs=-35.92

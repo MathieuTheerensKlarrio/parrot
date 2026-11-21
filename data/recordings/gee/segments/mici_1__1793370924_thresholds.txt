@@ -1,0 +1,2 @@
+gee_duration_type=continuous
+gee_min_dbfs=-23.78

@@ -1,0 +1,2 @@
+shp_duration_type=continuous
+shp_min_dbfs=-33.39

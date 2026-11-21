@@ -1,0 +1,2 @@
+catchee_duration_type=continuous
+catchee_min_dbfs=-23.71

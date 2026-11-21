@@ -1,0 +1,2 @@
+pst_duration_type=continuous
+pst_min_dbfs=-33.28

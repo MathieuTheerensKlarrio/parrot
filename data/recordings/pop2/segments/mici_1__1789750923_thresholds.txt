@@ -1,0 +1,2 @@
+pop2_duration_type=discrete
+pop2_min_dbfs=-35.56

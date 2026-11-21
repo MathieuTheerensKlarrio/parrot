@@ -1,0 +1,2 @@
+fk_duration_type=discrete
+fk_min_dbfs=-28.29

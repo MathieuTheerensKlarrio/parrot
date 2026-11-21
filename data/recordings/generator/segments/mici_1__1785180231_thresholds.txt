@@ -1,0 +1,2 @@
+generator_duration_type=continuous
+generator_min_dbfs=-55.27

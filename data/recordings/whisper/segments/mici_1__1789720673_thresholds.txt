@@ -1,0 +1,2 @@
+whisper_duration_type=continuous
+whisper_min_dbfs=-35.71

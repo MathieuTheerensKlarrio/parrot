@@ -1,0 +1,2 @@
+iyi_duration_type=continuous
+iyi_min_dbfs=-22.94

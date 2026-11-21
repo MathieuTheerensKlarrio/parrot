@@ -1,0 +1,2 @@
+bang_duration_type=continuous
+bang_min_dbfs=-34.43

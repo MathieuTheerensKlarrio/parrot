@@ -1,0 +1,2 @@
+chatterfull_duration_type=
+chatterfull_min_dbfs=-43.28

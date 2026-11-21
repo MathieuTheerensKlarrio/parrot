@@ -1,0 +1,2 @@
+wind_duration_type=continuous
+wind_min_dbfs=-37.12

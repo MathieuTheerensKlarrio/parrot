@@ -1,0 +1,2 @@
+yok_duration_type=continuous
+yok_min_dbfs=-25.95

@@ -1,0 +1,2 @@
+shotgun_duration_type=continuous
+shotgun_min_dbfs=-36.06

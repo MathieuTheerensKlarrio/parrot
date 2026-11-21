@@ -1,0 +1,2 @@
+boom_duration_type=continuous
+boom_min_dbfs=-30.38
