@@ -154,8 +154,10 @@ def classification_consumer( stream, classifier, persist_files, high_speed ):
                 print( short_comment )
             
             listening_state['classifierQueue'].put( probabilityDict )
-            if( persist_files ):        
-                audioFile = wave.open(REPLAYS_AUDIO_FOLDER + "/%0.3f.wav" % (seconds_playing), 'wb')
+            if( persist_files ):
+                # persist_files is either True ( the replay audio folder ) or the folder to save the chunks in
+                audio_folder = persist_files if isinstance( persist_files, str ) else REPLAYS_AUDIO_FOLDER
+                audioFile = wave.open(audio_folder + "/%0.3f.wav" % (seconds_playing), 'wb')
                 audioFile.setnchannels(classifier.get_setting('CHANNELS', CHANNELS))
                 audioFile.setsampwidth(SAMPLE_WIDTH)
                 audioFile.setframerate(classifier.get_setting('RATE', RATE))

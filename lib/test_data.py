@@ -17,6 +17,8 @@ from lib.listen import start_nonblocking_listen_loop, predict_wav_files, validat
 from lib.machinelearning import feature_engineering
 import csv
 from lib.audio_model import AudioModel
+from lib.recording_accuracy import evaluate_recordings, settings_mismatches
+from lib.replay_audio import list_recordings, new_recording_folder, chunk_time
 from sklearn.metrics import precision_recall_fscore_support
 
 def test_data( with_intro ):
@@ -149,6 +151,25 @@ def plot_audio( folder ):
         print( "Average: " + str( np.average( frequencies ) ) )
         print( "Standard deviation: " + str( np.std( frequencies ) ) )
         
+def choose_audio_recording():
+    recordings = list_recordings( REPLAYS_AUDIO_FOLDER )
+    if len( recordings ) == 0:
+        print( "No audio recordings found in " + REPLAYS_AUDIO_FOLDER + " - Record one first using [N]" )
+        return None
+
+    print( "-------------------------" )
+    print( "Available recordings ( newest first ):" )
+    for index, recording in enumerate( recordings ):
+        print( " - [" + str( index + 1 ) + "] " + recording.name + " ( %0.1f seconds )" % recording.seconds )
+
+    while True:
+        choice = input( "Type the number of the recording that you want to analyse ( default is 1 ): " ).strip()
+        if choice == "":
+            return recordings[0]
+        if choice.isdigit() and 1 <= int( choice ) <= len( recordings ):
+            return recordings[ int( choice ) - 1 ]
+        print( "Please type a number between 1 and " + str( len( recordings ) ) )
+
 def audio_analysis( available_models ):
     print( "-------------------------" )
     print( "Putting our algorithms to the test!")
@@ -159,30 +180,19 @@ def audio_analysis( available_models ):
     classifier = choose_classifier( available_models )
     
     if not os.path.exists(REPLAYS_AUDIO_FOLDER ):
-        os.makedirs(REPLAYS_AUDIO_FOLDER)    
+        os.makedirs(REPLAYS_AUDIO_FOLDER)
 
-    wav_files = os.listdir(REPLAYS_AUDIO_FOLDER)
-    
-    print( "Should we analyse the existing audio files or record a new set?" )
-    print( " - [E] for using the existing files" )
-    print( " - [N] for clearing the files and recording new ones" )
+    print( "Should we analyse an existing audio recording or record a new one?" )
+    print( " - [E] for using an existing recording" )
+    print( " - [N] for recording a new one" )
     new_or_existing = ""
     while( new_or_existing == "" ):
         new_or_existing = input("")
-    
+
     if( new_or_existing.lower() == "n" ):
         if (validate_microphone_input() == False):
             return
-    
-        for wav_file in wav_files:
-            file_path = os.path.join(REPLAYS_AUDIO_FOLDER, wav_file)
-            if( file_path.endswith(".wav") ):
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                except Exception as e:
-                    print("Could not delete " + wav_file)
-        
+
         print( "-------------------------" )
         seconds = input("How many seconds of audio should we record? ( default is 15 )" )
         if( seconds == "" ):
@@ -195,34 +205,28 @@ def audio_analysis( available_models ):
             print("Recording in... " + str(abs(i)), end="\r")
             sleep( 1 )
             
-        print( "Recording new audio files" )
-        replay_file = start_nonblocking_listen_loop( classifier, False, True, True, seconds, True )
+        recording_folder = new_recording_folder( REPLAYS_AUDIO_FOLDER )
+        print( "Recording new audio files in " + recording_folder )
+        replay_file = start_nonblocking_listen_loop( classifier, False, True, recording_folder, seconds, True )
         classifier = None
         print( "-------------------------" )
+        print( "Saved this recording as '" + os.path.basename( recording_folder ) + "' - Use [E] to analyse it again later" )
         print( "Analyzing file " + replay_file )
         plot_replay( pd.read_csv( replay_file, skiprows=0, header=0) )
     elif( new_or_existing.lower() == "e" ):
+        recording = choose_audio_recording()
+        if recording is None:
+            test_data( True )
+            return
         print( "-------------------------" )
-        print( "Analysing existing audio files" )
-        full_wav_files = []
-        
-        # First sort the wav files by time
-        raw_wav_filenames = []
-        for wav_file in wav_files:
-            if( wav_file.endswith(".wav") ):
-                raw_wav_filenames.append( float( wav_file.replace(".wav", "") ) )
-                
-        raw_wav_filenames.sort()
-        
-        for float_wav_file in raw_wav_filenames:
-            wav_file_name = '%0.3f.wav' % ( float_wav_file )
-            file_path = os.path.join(REPLAYS_AUDIO_FOLDER, wav_file_name )
-            full_wav_files.append( file_path )
-                
+        print( "Analysing recording " + recording.name )
+        full_wav_files = recording.chunks
+
         predictions = predict_wav_files( classifier, full_wav_files )
-        
+
         dataRows = []
-        with open(REPLAYS_FOLDER + '/analysis-replay-' + str(time.time()) + '.csv', 'a', newline='') as csvfile:    
+        recording_suffix = "" if recording.folder == REPLAYS_AUDIO_FOLDER else os.path.basename( recording.folder ) + "-"
+        with open(REPLAYS_FOLDER + '/analysis-replay-' + recording_suffix + str(time.time()) + '.csv', 'a', newline='') as csvfile:
             headers = ['time', 'winner', 'intensity', 'frequency', 'power', 'actions', 'buffer']
             headers.extend( classifier.classes_ )
             if ('silence' not in classifier.classes_):
@@ -231,8 +235,7 @@ def audio_analysis( available_models ):
             writer.writeheader()
                     
             for index, prediction in enumerate( predictions ):
-                timeString = full_wav_files[ index ].replace( REPLAYS_AUDIO_FOLDER + os.sep, "" ).replace( ".wav", "" )
-                dataRow = {'time': int(float(timeString) * 1000) / 1000, 'intensity': 0, 'power': 0, 'actions': [], 'buffer': 0 }
+                dataRow = {'time': int(chunk_time( full_wav_files[ index ] ) * 1000) / 1000,'intensity': 0, 'power': 0, 'actions': [], 'buffer': 0 }
                 for column in prediction:
                     dataRow[column] = prediction[ column ]['percent']
                     if( prediction[ column ]['winner'] ):
@@ -278,7 +281,7 @@ def choose_classifier( available_models ):
             'CHANNELS': CHANNELS,
             'RECORD_SECONDS': RECORD_SECONDS,
             'SLIDING_WINDOW_AMOUNT': SLIDING_WINDOW_AMOUNT,
-            'feature_engineering': FEATURE_ENGINEERING_TYPE
+            'FEATURE_ENGINEERING_TYPE': FEATURE_ENGINEERING_TYPE
         }
         classifier = AudioModel( settings, classifier )
 
@@ -290,62 +293,63 @@ def test_accuracy( available_models, available_sounds ):
     print( "-------------------------" )
     print( "Putting our algorithms to the test!")
     print( "This script is going to load in your model" )
-    print( "And test its accuracy against the given sounds" )
+    print( "And test its accuracy against your segmented recordings" )
     print( "-------------------------" )
-    
+
     classifier = choose_classifier( available_models )
-    
+
     threshold = input("At what percentage should we consider a sound accurately detected? " )
-    if( threshold == "" ):
+    try:
+        threshold = int( threshold ) if threshold.strip() != "" else 0
+    except ValueError:
+        print( "'" + threshold + "' is not a whole number - Using 0 instead" )
         threshold = 0
-    else:
-        threshold = int( threshold )
+
+    for mismatch in settings_mismatches( classifier ):
+        print( "Warning - This model was trained with different audio settings, results may be off ( " + mismatch + " )" )
 
     print( "Analysing..." )
-    true_wav_file_labels = []
-    predicted_wav_file_labels = []
-    for index, sound in enumerate(available_sounds):
-        if( sound in classifier.classes_ or ( MICROPHONE_SEPARATOR and sound.split( MICROPHONE_SEPARATOR )[0] in classifier.classes_ ) ):
-            # First sort the wav files by time
-            recordings_dir = os.path.join(RECORDINGS_FOLDER, sound, "segments" )
-            wav_files = os.listdir(recordings_dir)            
-            full_wav_files = []
-            
-            print( "----- " + str(sound) + " -----" )
-            if MICROPHONE_SEPARATOR:
-                sound = sound.split( MICROPHONE_SEPARATOR )[0]
+    result = evaluate_recordings( classifier, RECORDINGS_FOLDER, threshold,
+        progress=lambda name: print( ( "Classifying " + name ).ljust(80)[:80], end="\r" ) )
+    print( "".ljust(80), end="\r" )
 
-            i = 0
-            for wavindex, wav_file in enumerate(wav_files):
-                if( wav_file.endswith(".wav") and i < 5000 ):
-                    file_path = os.path.join(recordings_dir, wav_file )
-                    true_wav_file_labels.append(sound)                    
-                    full_wav_files.append( file_path )
-                    i += 1
+    for missing_file in result["missing_srt"]:
+        print( "Skipped " + missing_file + " - No segmentation ( .vN.srt or .MANUAL.srt ) found for it" )
 
-            predictions = predict_wav_files( classifier, full_wav_files )
-            i_correct = 0
-            for prediction in predictions:
-                for key in prediction:
-                    if prediction[key]['winner']:
-                        predicted_wav_file_labels.append(key)
-                if( sound in prediction and prediction[sound]['winner'] and prediction[sound]['percent'] >= threshold ):
-                    i_correct += 1
-            if i > 0:
-                print( "Accuracy above threshold %0d - %0.1f " % ( threshold, round((i_correct / i) * 100.0) ), end="\n" )
-    
-    total_metrics = precision_recall_fscore_support( true_wav_file_labels, predicted_wav_file_labels, average=None, labels=classifier.classes_, beta=0.5 )
-    print("Output label".ljust(30) + " P       R       F0.5    Samples")
-    print("----------------------------------------------------------------")
-    for index, sound in enumerate(classifier.classes_):
-        print( sound.ljust(30) + " %0.2f    %0.2f    %0.2f    %0d" % ( total_metrics[0][index], total_metrics[1][index], total_metrics[2][index], total_metrics[3][index] ) )
-    print("----------------------------------------------------------------")
-    print("Total percentiles")
-    print("50th".ljust(30) + " %0.2f    %0.2f    %0.2f" % (np.percentile(total_metrics[0], 50), np.percentile(total_metrics[1], 50), np.percentile(total_metrics[2], 50)))
-    print("75th".ljust(30) + " %0.2f    %0.2f    %0.2f" % (np.percentile(total_metrics[0], 75), np.percentile(total_metrics[1], 75), np.percentile(total_metrics[2], 75)))
-    print("95th".ljust(30) + " %0.2f    %0.2f    %0.2f" % (np.percentile(total_metrics[0], 95), np.percentile(total_metrics[1], 95), np.percentile(total_metrics[2], 95)))
+    if len( result["true"] ) == 0:
+        print( "No segmented recordings were found for the sounds this model detects: " + ", ".join( classifier.classes_ ) )
+        print( "Make sure the recordings folder contains <sound>/source/*.wav files with matching <sound>/segments/*.srt files" )
+        test_data( True )
+        return
+
+    true_labels = np.array( result["true"] )
+    predicted_labels = np.array( result["predicted"] )
+    labels = list( classifier.classes_ )
+    total_metrics = precision_recall_fscore_support( true_labels, predicted_labels, average=None, labels=labels, beta=0.5, zero_division=0 )
+
+    print( "Every window counts as correct when the right sound wins with at least " + str( threshold ) + "%" )
+    print( "Output label".ljust(30) + " P       R       F0.5    Windows   Most often mistaken for" )
+    print( "----------------------------------------------------------------------------------------" )
+    for index, sound in enumerate( labels ):
+        mistakes = predicted_labels[ ( true_labels == sound ) & ( predicted_labels != sound ) ]
+        mistaken_for = ""
+        if len( mistakes ) > 0:
+            mistake_labels, mistake_counts = np.unique( mistakes, return_counts=True )
+            top = np.argsort( -mistake_counts )[:2]
+            mistaken_for = ", ".join( "%s (%0.1f%%)" % ( mistake_labels[i], mistake_counts[i] / total_metrics[3][index] * 100 ) for i in top )
+        print( sound.ljust(30) + " %0.2f    %0.2f    %0.2f    %-9d %s" % ( total_metrics[0][index], total_metrics[1][index], total_metrics[2][index], total_metrics[3][index], mistaken_for ) )
+    print( "----------------------------------------------------------------------------------------" )
+
+    # Only labels that had recordings to test against count towards the totals
+    tested = total_metrics[3] > 0
+    print( "Total percentiles ( over " + str( int( tested.sum() ) ) + " tested labels )" )
+    for percentile in [50, 75, 95]:
+        print( ( str( percentile ) + "th" ).ljust(30) + " %0.2f    %0.2f    %0.2f" % tuple( np.percentile( total_metrics[i][tested], percentile ) for i in range(3) ) )
+    untested = [ sound for index, sound in enumerate( labels ) if not tested[index] ]
+    if len( untested ) > 0:
+        print( "No recordings to test against for: " + ", ".join( untested ) )
     test_data(True)
-    
+
 def analyze_replay_or_audio( available_models, available_replays, available_sounds ):
     replay_or_audio = input( "" )
     if( replay_or_audio.lower() == "r" ):
